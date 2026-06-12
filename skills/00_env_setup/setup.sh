@@ -1,53 +1,115 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-echo "=== Spateo Environment Setup ==="
-echo "Python: $(python3 --version 2>&1 || echo 'not found')"
-echo "Platform: $(uname -s) $(uname -m)"
+# ── Spateo Environment Setup ──────────────────────────────────────
+# Detects conda and uv, prompts user to choose, then installs.
+# ───────────────────────────────────────────────────────────────────
 
-# Detect package manager
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CONDA_ENV="environment.yml"
+UV_REQUIREMENTS="uv_requirements.txt"
+UV_PYPROJECT="uv_pyproject.toml"
+ENV_NAME="spateo"
+
+echo "========================================"
+echo "  Spateo Environment Setup"
+echo "========================================"
+echo ""
+
+# Detect available tools
+HAS_CONDA=false
+HAS_UV=false
+PYTHON_VER=""
+
 if command -v conda &>/dev/null; then
-    MANAGER="conda"
-    echo "Detected: conda"
-elif command -v pip3 &>/dev/null || command -v pip &>/dev/null; then
-    MANAGER="venv"
-    echo "Detected: pip/venv (no conda)"
-else
-    echo "ERROR: No Python package manager found"
+    HAS_CONDA=true
+    echo "[OK] conda: $(conda --version 2>&1 | head -1)"
+fi
+
+if command -v uv &>/dev/null; then
+    HAS_UV=true
+    echo "[OK] uv:     $(uv --version 2>&1)"
+fi
+
+if python3 --version &>/dev/null; then
+    PYTHON_VER="$(python3 --version 2>&1)"
+    echo "[OK] python: $PYTHON_VER"
+fi
+echo ""
+
+# If neither, abort
+if [ "$HAS_CONDA" = false ] && [ "$HAS_UV" = false ]; then
+    echo "ERROR: Neither conda nor uv found."
+    echo "Install one of:"
+    echo "  conda: https://docs.conda.io/en/latest/miniconda.html"
+    echo "  uv:    https://docs.astral.sh/uv/"
     exit 1
 fi
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-REQUIREMENTS="$SCRIPT_DIR/requirements.txt"
-
-if [ "$MANAGER" = "conda" ]; then
-    echo "Creating conda environment 'spateo'..."
-    conda create -n spateo python=3.10 -y
-    conda activate spateo
-    echo "Installing requirements..."
-    pip install --upgrade pip
-    pip install -r "$REQUIREMENTS"
+# Auto-select if only one available
+if [ "$HAS_CONDA" = true ] && [ "$HAS_UV" = false ]; then
+    CHOICE="conda"
+elif [ "$HAS_CONDA" = false ] && [ "$HAS_UV" = true ]; then
+    CHOICE="uv"
 else
-    VENV_DIR=".venv-spateo"
-    echo "Creating venv at $VENV_DIR..."
-    python3 -m venv "$VENV_DIR"
-    source "$VENV_DIR/bin/activate"
-    echo "Installing requirements..."
-    pip install --upgrade pip
-    pip install -r "$REQUIREMENTS"
+    # Both available — ask user
+    echo "Both conda and uv detected. Choose environment manager:"
+    echo "  1) conda  (full dependency resolution, larger env)"
+    echo "  2) uv     (fast, lightweight, pip-compatible)"
+    echo ""
+    read -rp "Select [1/2] (default: 2): " ANSWER
+    case "$ANSWER" in
+        1) CHOICE="conda" ;;
+        *) CHOICE="uv" ;;
+    esac
 fi
 
 echo ""
-echo "=== Verification ==="
-python -c "import spateo; print(f'spateo: {spateo.__version__}')" 2>&1 || echo "  spateo: FAILED"
-python -c "import pyvista; print(f'pyvista: {pyvista.__version__}')" 2>&1 || echo "  pyvista: FAILED"
-python -c "import scanpy; print(f'scanpy: {scanpy.__version__}')" 2>&1 || echo "  scanpy: FAILED"
-python -c "import anndata; print(f'anndata: {anndata.__version__}')" 2>&1 || echo "  anndata: FAILED"
-
+echo "Using: $CHOICE"
+echo "========================================"
 echo ""
-echo "=== Setup Complete ==="
-if [ "$MANAGER" = "conda" ]; then
-    echo "Activate with: conda activate spateo"
-else
+
+if [ "$CHOICE" = "conda" ]; then
+    echo "Creating conda environment '$ENV_NAME'..."
+    conda env create -f "$SCRIPT_DIR/$CONDA_ENV" -y
+    echo ""
+    echo "========================================"
+    echo "  Setup Complete"
+    echo "========================================"
+    echo "Activate with: conda activate $ENV_NAME"
+    echo ""
+    echo "Verify:"
+    echo "  conda activate $ENV_NAME"
+    echo "  python -c 'import spateo; print(spateo.__version__)'"
+
+elif [ "$CHOICE" = "uv" ]; then
+    echo "Creating uv-managed venv..."
+
+    # Use uv venv to create environment
+    VENV_DIR=".venv-spateo"
+    if command -v python3.10 &>/dev/null; then
+        uv venv "$VENV_DIR" --python 3.10
+    else
+        uv venv "$VENV_DIR" --python 3.10
+    fi
+
+    # Activate venv
+    source "$VENV_DIR/bin/activate"
+
+    # Install via uv pip (fast, uses requirements.txt)
+    echo "Installing dependencies (uv pip)..."
+    uv pip install -r "$SCRIPT_DIR/$UV_REQUIREMENTS"
+
+    echo ""
+    echo "========================================"
+    echo "  Setup Complete"
+    echo "========================================"
     echo "Activate with: source $VENV_DIR/bin/activate"
+    echo ""
+    echo "Verify:"
+    echo "  source $VENV_DIR/bin/activate"
+    echo "  python -c 'import spateo; print(spateo.__version__)'"
+    echo ""
+    echo "Alternative: use pyproject.toml"
+    echo "  uv sync --project $SCRIPT_DIR/$UV_PYPROJECT"
 fi

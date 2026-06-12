@@ -1,0 +1,45 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+*.egg
+dist/
+build/
+*.so
+.pytest_cache/
+.mypy_cache/
+
+# Virtual environments
+.venv/
+.venv-spateo/
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Skill runtime outputs
+*.log
+*.h5ad
+*.vtk
+*.vtp
+models/
+figures/
+output/
+
+# Secrets
+.env
+.env.local
+*.key
+*.pem
+
+# Claude
+.claude/

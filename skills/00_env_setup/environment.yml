@@ -1,0 +1,138 @@
+# Spateo + ref_scripts Conda Environment
+# Target: Python 3.10 on Linux
+# Strategy: maximize conda-forge, minimize pip
+# Generated: 2026-06-12
+name: spateo
+channels:
+  - conda-forge
+dependencies:
+  # ── Python ──────────────────────────────────────────────────────
+  - python=3.10
+
+  # ── Core scientific (pinned per Spateo py<3.11 constraints) ────
+  - numpy=1.23.5
+  - scipy>=1.0,<1.11
+  - pandas>=0.25.1,<=1.5.3
+
+  # ── ML / Stats ─────────────────────────────────────────────────
+  - scikit-learn>=1.0
+  - scikit-image>=0.18.0
+  - statsmodels>=0.14.0
+  - seaborn>=0.13.0
+
+  # ── Deep Learning ──────────────────────────────────────────────
+  - pytorch>=2.0.0
+  - pytorch-cuda=12.1
+
+  # ── Probabilistic / GPU ────────────────────────────────────────
+  - gpytorch>=1.10
+  - pyro-ppl>=1.8
+  - opt-einsum
+
+  # ── Numerical acceleration ─────────────────────────────────────
+  - numba>=0.56.0
+  - llvmlite
+
+  # ── Single-cell / spatial transcriptomics ──────────────────────
+  - anndata>=0.8.0,<0.10.0
+  - scanpy>=1.9.0
+  - h5py>=3.7.0,<3.9.0
+  - loompy>=3.0.5
+  - mudata>=0.2.0
+  - leidenalg>=0.10.0
+  - python-igraph>=1.0.0
+  - umap-learn>=0.5.12
+  - pynndescent>=0.5.0
+
+  # ── Geospatial ─────────────────────────────────────────────────
+  - geopandas>=0.14.0
+  - shapely>=1.8.0,<2.0
+  - fiona>=1.9.0
+  - pyproj>=3.5.0
+  - rasterio>=1.3.0
+  - pyogrio>=0.7.0
+  - rtree>=1.0.0
+  - descartes
+  - affine
+
+  # ── PySAL ecosystem ────────────────────────────────────────────
+  - libpysal
+  - mapclassify>=2.4.2
+  - esda
+  - giddy
+  - inequality
+  - pointpats
+  - segregation
+  - spaghetti
+  - spglm
+  - spint
+  - splot
+  - spopt
+  - spreg
+  - spvcm
+  - tobler
+  - momepy
+  - mgwr
+  - quantecon
+
+  # ── 3D visualization ───────────────────────────────────────────
+  - vtk>=9.2.2
+  - pyvista>=0.39.1
+  - trame>=2.2.5
+  - trame-server>=2.7.0
+
+  # ── Optimal transport ──────────────────────────────────────────
+  - pot>=0.9.0
+
+  # ── Plotting / viz ─────────────────────────────────────────────
+  - matplotlib>=3.7.5
+  - plotly>=5.1.0
+  - folium>=0.12.1
+  - colorcet>=2.0.1
+  - ipywidgets>=7.7.1
+  - adjusttext>=1.3.0
+  - kneed>=0.7.0
+
+  # ── Image processing ───────────────────────────────────────────
+  - opencv>=4.5
+  - csbdeep>=0.6.3
+  - kornia>=0.6.4
+  - pillow>=10.0.0
+  - imageio>=2.30.0
+  - tifffile>=2023.0.0
+
+  # ── 3D mesh (conda-forge) ──────────────────────────────────────
+  - open3d>=0.16.0
+  - pyacvd>=0.2.9
+  - pymeshfix>=0.15.0
+  - pymcubes>=0.1.6
+  - pykdtree
+
+  # ── Data formats ───────────────────────────────────────────────
+  - pyarrow>=14.0.0
+  - openpyxl>=3.1.0
+
+  # ── Utilities ──────────────────────────────────────────────────
+  - networkx>=2.6.3
+  - tqdm>=4.62.3
+  - requests>=2.34.0
+  - pyyaml>=6.0.0
+  - psutil>=5.6.3
+  - pooch
+  - nbconvert>=7.0.0
+  - ipykernel
+  - sympy
+  - pulp
+  - session-info
+
+  # ── dynamo-release (conda-forge only, NOT on PyPI) ─────────────
+  - dynamo-release>=1.5.0
+
+  # ── pip fallback (only for packages NOT on conda-forge) ────────
+  - pip
+  - pip:
+      # Spateo — not on PyPI, install from official GitHub
+      - spateo-release @ git+https://github.com/aristoteleo/spateo-release.git@main
+
+      # setuptools constraint from Spateo setup.py
+      - setuptools>=58.0.4,<81

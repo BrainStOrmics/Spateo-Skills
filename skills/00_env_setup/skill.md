@@ -1,59 +1,85 @@
 ---
 name: spateo-env-setup
-description: Set up Spateo runtime environment with conda or venv
+description: Set up Spateo runtime environment — choose conda or uv
 ---
 
 # Spateo Environment Setup
 
-## Purpose
-Configure a reproducible Python environment for running Spateo spatial transcriptomics skills.
+Configure a reproducible Python environment for Spateo spatial transcriptomics skills.
+Supports both **conda** (full dependency resolution) and **uv** (fast, lightweight).
 
-## Prerequisites
-- Python 3.10 (conda or system)
-- Linux (x86_64) or macOS (arm64/x86_64)
+## Quick Setup
 
-## Method 1: Conda (recommended for complex deps)
+### Automated (interactive choice)
 
 ```bash
-conda create -n spateo python=3.10 -y
+bash skills/00_env_setup/setup.sh
+```
+
+Script detects available tools and prompts you to choose between conda and uv.
+If only one is installed, it auto-selects.
+
+### Manual — conda
+
+```bash
+conda env create -f skills/00_env_setup/environment.yml
 conda activate spateo
-pip install -r Spateo-Skills/00_env_setup/requirements.txt
 ```
 
-## Method 2: venv + pip
+Best for:
+- Complex native dependencies (geospatial, VTK, Open3D)
+- GPU environments (pytorch-cuda included)
+- Platforms where pip wheels fail (Linux ARM, macOS arm64)
+
+### Manual — uv (recommended for speed)
 
 ```bash
-python3.10 -m venv .venv-spateo
+# Option A: from requirements.txt (fastest)
+uv venv .venv-spateo --python 3.10
 source .venv-spateo/bin/activate
-pip install --upgrade pip
-pip install -r Spateo-Skills/00_env_setup/requirements.txt
+uv pip install -r skills/00_env_setup/uv_requirements.txt
+
+# Option B: from pyproject.toml (locked resolution)
+uv sync --project skills/00_env_setup/uv_pyproject.toml
 ```
+
+Best for:
+- Fast installation (10x faster than pip)
+- CI/CD pipelines
+- Developers who want a clean, reproducible venv
+
+## Environment Files
+
+| File | Manager | Description |
+|------|---------|-------------|
+| `environment.yml` | conda | Full conda-forge spec with pip fallback for spateo-release |
+| `uv_requirements.txt` | uv/pip | Flat requirements, version ranges for Python 3.10 |
+| `uv_pyproject.toml` | uv | pyproject.toml with `[tool.uv]` config and git sources |
 
 ## Key Dependencies
-- **spateo-release** — core library (git install)
-- **torch** — deep learning backend
-- **pyvista** — 3D visualization (requires VTK)
+
+- **spateo-release** — core library (git install, not on PyPI)
+- **torch** — deep learning backend (>=2.0,<2.5 for Python 3.10)
+- **pyvista** — 3D visualization (requires VTK>=9.2)
 - **scanpy** — single-cell analysis
 - **anndata** — AnnData format
-- **numpy==1.23.5** — pinned for spateo compatibility
-- **scipy==1.10.1** — scientific computing
-
-## Platform Notes
-- **Linux**: VTK/pyvista install cleanly via pip
-- **macOS arm64**: Some packages (open3d, vtk) may need conda-forge
-- The original `envs/environment.yml` was macOS-specific with hardcoded prefix
-- `requirements.txt` in this directory is cleaned for cross-platform use
+- **numpy** — pinned >=1.21,<1.24 for Spateo compatibility
 
 ## Verification
 
 ```bash
-python -c "import spateo; print(spateo.__version__)"
-python -c "import pyvista; print(pyvista.__version__)"
-python -c "import scanpy; print(scanpy.__version__)"
+python -c "import spateo; print(f'spateo: {spateo.__version__}')"
+python -c "import pyvista; print(f'pyvista: {pyvista.__version__}')"
+python -c "import scanpy; print(f'scanpy: {scanpy.__version__}')"
 ```
 
 ## Troubleshooting
-- `numpy` version conflict: install `numpy==1.23.5` first, then other deps
-- `vtk` build failure: install `vtk` via conda (`conda install -c conda-forge vtk`)
-- `pyvista` headless: `export PYVISTA_OFF_SCREEN=true`
-- POT library: `conda install -c conda-forge pot` if pip fails
+
+| Problem | Fix |
+|---------|-----|
+| `numpy` version conflict | Install `numpy>=1.21,<1.24` first |
+| `vtk` build failure | Use conda: `conda install -c conda-forge vtk` |
+| `pyvista` headless | `export PYVISTA_OFF_SCREEN=true` |
+| POT library missing | conda: `conda install -c conda-forge pot` |
+| `dynamo-release` not on PyPI | conda: `conda install -c conda-forge dynamo-release` |
+| uv too old | `uv self update` |
