@@ -47,5 +47,15 @@ def test_env_setup_files_exist():
     """Environment setup files must exist."""
     env = SKILLS_ROOT / "00_env_setup"
     assert (env / "setup.sh").exists(), "setup.sh missing"
-    assert (env / "requirements.txt").exists(), "requirements.txt missing"
+    assert (env / "environment.yml").exists(), "environment.yml missing"
+    assert (env / "uv_requirements.txt").exists(), "uv_requirements.txt missing"
+    assert (env / "uv_pyproject.toml").exists(), "uv_pyproject.toml missing"
     assert (env / "skill.md").exists(), "skill.md missing"
+
+
+def test_skill_md_files_exist():
+    """Each skill directory should have a SKILL.md or skill.md."""
+    for skill_dir in SKILLS_ROOT.iterdir():
+        if skill_dir.is_dir() and not skill_dir.name.startswith("."):
+            has_any = (skill_dir / "SKILL.md").exists() or (skill_dir / "skill.md").exists()
+            assert has_any, f"{skill_dir.name}/ missing SKILL.md or skill.md"

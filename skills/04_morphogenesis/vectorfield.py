@@ -1,5 +1,13 @@
-"""Stage 3 morphogenesis: cell mapping, vector field, and trajectory analysis."""
+"""Stage 3 morphogenesis: cell mapping, vector field, and trajectory analysis.
 
+Computes cell state transitions between two developmental stages using
+sparse VFC (Vector Field Corrector) and optimal transport (POT).
+Infers morphogenesis trajectories via morphopath.
+
+Usage:
+    python -m skills.04_morphogenesis.vectorfield 
+        --stage1 ./data/stage1.h5ad --stage2 ./data/stage2.h5ad
+"""
 from __future__ import annotations
 
 import argparse

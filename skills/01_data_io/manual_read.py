@@ -1,5 +1,16 @@
 #!/usr/bin/env python3
-"""manual_read — Skill: platform-specific spatial transcriptomics readers.
+"""manual_read — Platform-specific spatial transcriptomics readers.
+
+Each reader wraps ``spateo.io.protocol_io.spatial.*`` and converts raw data
+into AnnData with ``.obsm["spatial"]`` populated. Use ``read_by_platform()``
+to dispatch by platform name, or call individual readers directly.
+
+Usage:
+    python -m skills.01_data_io.manual_read --platform xenium --data-path ./data/xenium_outs/
+
+Supported: MERFISH, seqFISH, Slide-seq, STARmap+, Stereo-seq, Xenium,
+Visium, Visium HD, Open-ST.
+
 Source notebooks: merfish(1), seqfish(1), slideseq(1), starmap_plus(1),
 stereoseq(1), xenium(1), visium(1), visium_hd(2), openst.
 """

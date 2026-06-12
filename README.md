@@ -21,13 +21,19 @@ uv venv .venv-spateo --python 3.10 && source .venv-spateo/bin/activate
 uv pip install -r skills/00_env_setup/uv_requirements.txt
 ```
 
-### 2. Run a Skill
-
-Each skill is a standalone Python module with a CLI:
+### 2. Run the Full Pipeline
 
 ```bash
-# Stage 0 — Read spatial transcriptomics data
-python -m skills.01_data_io.manual_read --platform xenium --data-path ./data/xenium_outs/
+python -m skills.00_pipeline.run_all \
+  --data-path ./data/xenium_outs/ \
+  --platform xenium \
+  --stage2-path ./data/stage2.h5ad \
+  --out-dir ./output/
+```
+
+Or run stages individually:
+
+### 2b. Run Individual Skills
 
 # Stage 1 — Align two tissue slices
 python -m skills.02_slice_alignment.two_slice \

@@ -11,7 +11,7 @@ and boundary validation.
 ```
 skills/
 ├── 00_shared/          # Shared infrastructure (lazy imports, data helpers)
-├── 00_env_setup/       # Environment setup (conda/venv, requirements)
+├── 00_env_setup/       # Environment setup (conda + uv, interactive choice)
 ├── 01_data_io/         # Stage 0: platform-specific + auto-detect readers
 ├── 02_slice_alignment/ # Stage 1: 2D→3D coordinate registration
 ├── 03_3d_reconstruction/ # Stage 2: point cloud, mesh, interpolation, morphology
@@ -41,10 +41,15 @@ Every skill module follows `docs/architecture/PYTHON-PATTERNS.md`:
 ### Environment
 
 ```bash
+# Automated (prompts conda/uv choice if both available)
 bash skills/00_env_setup/setup.sh
-# or manually:
-conda create -n spateo python=3.10 -y && conda activate spateo
-pip install -r skills/00_env_setup/requirements.txt
+
+# Manual — conda
+conda env create -f skills/00_env_setup/environment.yml && conda activate spateo
+
+# Manual — uv (faster)
+uv venv .venv-spateo --python 3.10 && source .venv-spateo/bin/activate
+uv pip install -r skills/00_env_setup/uv_requirements.txt
 ```
 
 ### Run a Skill

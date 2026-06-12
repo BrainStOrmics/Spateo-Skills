@@ -1,5 +1,12 @@
 """Two-slice spatial alignment skill.
 
+Registers two tissue slices into a common coordinate space using
+st.align.morpho_align or st.align.morpho_align_ref (with downsampling).
+
+Usage:
+    python -m skills.02_slice_alignment.two_slice \
+        --slice1 ./data/slice_a.h5ad --slice2 ./data/slice_b.h5ad
+
 Source: cs13_Alignment(1).ipynb
 Data:   ../../data/skills_data/1.slices alignment/2_slices/
 """

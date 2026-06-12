@@ -1,5 +1,12 @@
-"""3D transcriptomics interpolation skill — vtk, gp, kernel, and deep methods."""
+"""3D transcriptomics interpolation skill — vtk, gp, kernel, and deep methods.
 
+Interpolates sparse gene expression onto dense 3D voxel grids, enabling
+continuous expression field visualization and downstream analysis.
+
+Usage:
+    python -m skills.03_3d_reconstruction.interpolation 
+        --input ./data/aligned.h5ad --method vtk --out-dir ./output
+"""
 from __future__ import annotations
 
 import argparse

@@ -1,5 +1,12 @@
 """Two-stage 3D model alignment skill.
 
+Stage 1: build point cloud/mesh from individual slices.
+Stage 2: align using reference-based morpho_align_ref.
+
+Usage:
+    python -m skills.02_slice_alignment.two_stage_3d \
+        --stage1 ./data/stage1.h5ad --stage2 ./data/stage2.h5ad
+
 Source: Alignment of 3D models(skill_code).ipynb
 Data:   ../../data/skills_data/3.3D model alignment/
 """

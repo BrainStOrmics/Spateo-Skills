@@ -1,5 +1,12 @@
-"""3D reconstruction skill — point cloud, surface mesh, cell mesh, voxel, and subtype models."""
+"""3D reconstruction skill — point cloud, surface mesh, cell mesh, voxel, and subtype models.
 
+Generates VTK/PyVista 3D models from aligned spatial transcriptomics data.
+Each model type captures a different level of structural detail.
+
+Usage:
+    python -m skills.03_3d_reconstruction.reconstruction 
+        --input ./data/aligned.h5ad --out-dir ./output --model-type surface
+"""
 from __future__ import annotations
 
 import argparse

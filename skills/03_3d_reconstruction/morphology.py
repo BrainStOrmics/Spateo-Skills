@@ -1,5 +1,12 @@
-"""3D model morphology skill — KDE density and morphology metrics."""
+"""3D model morphology skill — KDE density and morphology metrics.
 
+Computes spatial density via kernel density estimation (pc_KDE) and
+extracts morphology metrics (volume, surface area, sphericity) via model_morphology.
+
+Usage:
+    python -m skills.03_3d_reconstruction.morphology 
+        --input ./data/aligned.h5ad --out-dir ./output
+"""
 from __future__ import annotations
 
 import argparse

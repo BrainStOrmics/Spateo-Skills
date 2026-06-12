@@ -1,5 +1,13 @@
-"""Stage 3 morphogenesis: feature computation and GLM DEG analysis."""
+"""Stage 3 morphogenesis: feature computation and GLM DEG analysis.
 
+Extracts dynamic features from vector fields (velocity, acceleration,
+curvature, curl, torsion, jacobian) and identifies differentially
+expressed genes via GLM.
+
+Usage:
+    python -m skills.04_morphogenesis.feature 
+        --input ./data/vectorfield.h5ad --out-dir ./output
+"""
 from __future__ import annotations
 
 import argparse

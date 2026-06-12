@@ -1,5 +1,13 @@
 #!/usr/bin/env python3
-"""auto_read — Skill: auto-detect and read spatial transcriptomics data.
+"""auto_read — Auto-detect platform and read spatial transcriptomics data.
+
+Detects the spatial platform (Xenium, Visium, MERFISH, etc.) from the
+data directory structure, then reads data into AnnData with
+``.obsm["spatial"]`` populated.
+
+Usage:
+    python -m skills.01_data_io.auto_read --data-path ./data/unknown/
+
 Source notebook: autoread_skills.ipynb
 """
 

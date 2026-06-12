@@ -1,5 +1,12 @@
 """Continuous multi-slice spatial alignment and 3D reconstruction skill.
 
+Splits data by z-coordinate, aligns consecutive pairs via
+morpho_align_transformation, and concatenates into 3D.
+
+Usage:
+    python -m skills.02_slice_alignment.multi_slice \
+        --input ./data/slices/ --outdir ./output/
+
 Source: drosophila_Alignment(1).ipynb
 Data:   ../../data/skills_data/1.slices alignment/multi_slices/
 """
