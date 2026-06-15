@@ -1,18 +1,15 @@
 #!/usr/bin/env python3
 """manual_read — Platform-specific spatial transcriptomics readers.
 
-Each reader wraps ``spateo.io.protocol_io.spatial.*`` and converts raw data
-into AnnData with ``.obsm["spatial"]`` populated. Use ``read_by_platform()``
-to dispatch by platform name, or call individual readers directly.
+Wraps actual spateo IO functions: st.io.read_10x, st.io.read_bgi,
+st.io.read_slideseq, st.io.read_nanostring, st.io.read_image.
+Converts raw data into AnnData with .obsm["spatial"] populated.
 
 Usage:
     python -m skills.01_data_io.manual_read --platform xenium --data-path ./data/xenium_outs/
 
 Supported: MERFISH, seqFISH, Slide-seq, STARmap+, Stereo-seq, Xenium,
 Visium, Visium HD, Open-ST.
-
-Source notebooks: merfish(1), seqfish(1), slideseq(1), starmap_plus(1),
-stereoseq(1), xenium(1), visium(1), visium_hd(2), openst.
 """
 
 from __future__ import annotations
@@ -20,6 +17,8 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 from typing import Any, Callable, Dict, Optional, Union
+
+import numpy as np
 
 LOGGER = logging.getLogger("data_io.manual_read")
 
@@ -32,7 +31,7 @@ def _as_str(path: PathLike) -> str:
 
 def _import_spateo() -> Any:
     try:
-        import spateo as st  # type: ignore
+        import spateo as st
         return st
     except ImportError as exc:
         raise ImportError(
@@ -40,28 +39,69 @@ def _import_spateo() -> Any:
         ) from exc
 
 
-def _spateo_protocol_io() -> Any:
-    try:
-        import spateo.io.protocol_io as pio  # type: ignore
-        return pio
-    except Exception as exc:
-        raise ImportError(
-            "spateo.io.protocol_io is required for this reader."
-        ) from exc
+def read_10x_visium(
+    data_dir: PathLike,
+    *,
+    sample: Optional[str] = None,
+    **kwargs: Any,
+) -> Any:
+    """Read 10x Visium output directory."""
+    st = _import_spateo()
+    return st.io.read_10x(_as_str(data_dir), sample=sample, **kwargs)
 
 
-def _spateo_plus_io_or_spateo_io() -> Any:
-    try:
-        import spateo_plus as sp  # type: ignore
-        return sp.io
-    except Exception:
-        try:
-            import spateo as st  # type: ignore
-            return st.io
-        except Exception as exc:
-            raise ImportError(
-                "spateo_plus or spateo with io reader is required."
-            ) from exc
+def read_10x_visium_hd(
+    data_dir: PathLike,
+    *,
+    sample: Optional[str] = None,
+    **kwargs: Any,
+) -> Any:
+    """Read 10x Visium HD binned output."""
+    st = _import_spateo()
+    return st.io.read_10x(_as_str(data_dir), sample=sample, **kwargs)
+
+
+def read_xenium(
+    data_dir: PathLike,
+    **kwargs: Any,
+) -> Any:
+    """Read 10x Xenium output directory."""
+    st = _import_spateo()
+    return st.io.read_10x(_as_str(data_dir), **kwargs)
+
+
+def read_stereoseq(
+    gem_file: PathLike,
+    *,
+    binsize: int = 50,
+    **kwargs: Any,
+) -> Any:
+    """Read Stereo-seq GEM file."""
+    st = _import_spateo()
+    return st.io.read_bgi(_as_str(gem_file), binsize=binsize, **kwargs)
+
+
+def read_stereoseq_agg(
+    gem_file: PathLike,
+    image_file: PathLike,
+    **kwargs: Any,
+) -> Any:
+    """Read Stereo-seq GEM + image (aggregated)."""
+    st = _import_spateo()
+    return st.io.read_bgi_agg(_as_str(gem_file), _as_str(image_file), **kwargs)
+
+
+def read_slideseq(
+    data_dir: PathLike,
+    *,
+    beads_path: Optional[str] = None,
+    **kwargs: Any,
+) -> Any:
+    """Read Slide-seq output directory."""
+    st = _import_spateo()
+    if beads_path is None:
+        beads_path = _as_str(Path(data_dir) / "BeadLocationsForR.csv")
+    return st.io.read_slideseq(_as_str(data_dir), beads_path=beads_path, **kwargs)
 
 
 def read_merfish(
@@ -71,10 +111,27 @@ def read_merfish(
     meta_file: str = "cell_metadata.csv",
     **kwargs: Any,
 ) -> Any:
-    pio = _spateo_protocol_io()
-    return pio.spatial.read_merfish(
-        _as_str(data_dir), counts_file=counts_file, meta_file=meta_file, **kwargs
-    )
+    """Read MERFISH from CSV files (gene matrix + cell metadata with coords)."""
+    import anndata as ad
+    import pandas as pd
+
+    counts = pd.read_csv(Path(data_dir) / counts_file, index_col=0)
+    meta = pd.read_csv(Path(data_dir) / meta_file, index_col=0)
+
+    spatial_col_pairs = [
+        ("X_center", "Y_center"), ("center_x", "center_y"),
+        ("x", "y"), ("X", "Y"),
+    ]
+    for col_x, col_y in spatial_col_pairs:
+        if col_x in meta.columns and col_y in meta.columns:
+            spatial = meta[[col_x, col_y]].values
+            break
+    else:
+        raise ValueError(f"No spatial columns found in {meta_file}")
+
+    adata = ad.AnnData(X=counts.values, obs=meta, var=pd.DataFrame(index=counts.columns))
+    adata.obsm["spatial"] = spatial
+    return adata
 
 
 def read_seqfish(
@@ -85,82 +142,62 @@ def read_seqfish(
     load_images: bool = True,
     **kwargs: Any,
 ) -> Any:
-    pio = _spateo_protocol_io()
-    return pio.spatial.read_seqfish(
-        _as_str(data_dir),
-        counts_file=counts_file,
-        meta_file=meta_file,
-        load_images=load_images,
-        **kwargs,
-    )
+    """Read seqFISH from CxG CSV + coordinates CSV."""
+    import anndata as ad
+    import pandas as pd
 
+    counts = pd.read_csv(Path(data_dir) / counts_file, index_col=0)
+    coords = pd.read_csv(Path(data_dir) / meta_file, index_col=0)
 
-def read_slideseq(
-    data_dir: PathLike,
-    *,
-    load_images: bool = True,
-    **kwargs: Any,
-) -> Any:
-    pio = _spateo_protocol_io()
-    return pio.spatial.read_slideseq(
-        _as_str(data_dir), load_images=load_images, **kwargs
-    )
+    x_col = next((c for c in coords.columns if c.lower().startswith("x")), None)
+    y_col = next((c for c in coords.columns if c.lower().startswith("y")), None)
+    if x_col and y_col:
+        spatial = coords[[x_col, y_col]].values
+    else:
+        spatial = coords.iloc[:, :2].values
+
+    adata = ad.AnnData(X=counts.values, obs=coords, var=pd.DataFrame(index=counts.columns))
+    adata.obsm["spatial"] = spatial
+    return adata
 
 
 def read_starmap_plus(
     data_dir: PathLike,
     *,
     counts_file: str = "sagittal1processed_expression_pd.csv",
-    meta_file: str = "sagittal1_spot_meta.csv",
-    spatial_file: str = "sagittal1_spatial.csv",
+    meta_file: Optional[str] = None,
+    spatial_file: Optional[str] = None,
     **kwargs: Any,
 ) -> Any:
-    pio = _spateo_protocol_io()
-    return pio.spatial.read_starmap_plus(
-        _as_str(data_dir),
-        counts_file=counts_file,
-        meta_file=meta_file,
-        spatial_file=spatial_file,
-        **kwargs,
-    )
+    """Read STARmap+ from expression CSV + optional spatial metadata.
 
+    Expression file: rows=spots, cols=genes.
+    Spatial coords come from the spatial_file if provided, otherwise
+    defaults are used.
+    """
+    import anndata as ad
+    import pandas as pd
 
-def read_stereoseq(
-    gem_file: PathLike,
-    *,
-    binsize: int = 50,
-    **kwargs: Any,
-) -> Any:
-    pio = _spateo_protocol_io()
-    return pio.spatial.read_bgi(
-        _as_str(gem_file), binsize=binsize, **kwargs
-    )
+    counts = pd.read_csv(Path(data_dir) / counts_file, index_col=0)
+    var_names = counts.columns.tolist()
 
+    obs = {}
+    if meta_file:
+        meta = pd.read_csv(Path(data_dir) / meta_file, index_col=0)
+        obs = meta
 
-def read_stereoseq_agg(
-    gem_file: PathLike,
-    image_file: PathLike,
-    **kwargs: Any,
-) -> Any:
-    pio = _spateo_protocol_io()
-    return pio.spatial.read_bgi_agg(
-        _as_str(gem_file), _as_str(image_file), **kwargs
-    )
+    spatial = None
+    if spatial_file:
+        spatial_df = pd.read_csv(Path(data_dir) / spatial_file)
+        x_col = next((c for c in spatial_df.columns if c.lower() in ("x", "name")), None)
+        y_col = next((c for c in spatial_df.columns if c.lower() == "y"), None)
+        if x_col and y_col:
+            spatial = spatial_df[[x_col, y_col]].values
 
-
-def read_xenium(data_dir: PathLike, **kwargs: Any) -> Any:
-    io = _spateo_plus_io_or_spateo_io()
-    return io.read_xenium(_as_str(data_dir), **kwargs)
-
-
-def read_visium(data_dir: PathLike, **kwargs: Any) -> Any:
-    io = _spateo_plus_io_or_spateo_io()
-    return io.read_visium(_as_str(data_dir), **kwargs)
-
-
-def read_visium_hd(data_dir: PathLike, **kwargs: Any) -> Any:
-    io = _spateo_plus_io_or_spateo_io()
-    return io.read_visium_hd(_as_str(data_dir), **kwargs)
+    adata = ad.AnnData(X=counts.values, obs=pd.DataFrame(obs) if obs else None, var=pd.DataFrame(index=var_names))
+    if spatial is not None:
+        adata.obsm["spatial"] = spatial
+    return adata
 
 
 def read_openst(
@@ -169,10 +206,11 @@ def read_openst(
     h5ad_file: Optional[str] = None,
     **kwargs: Any,
 ) -> Any:
-    io = _spateo_plus_io_or_spateo_io()
-    if h5ad_file is None:
-        return io.read_openst(_as_str(data_dir), **kwargs)
-    return io.read_openst(_as_str(data_dir), h5ad_file=h5ad_file, **kwargs)
+    """Read Open-ST from h5ad or directory."""
+    st = _import_spateo()
+    if h5ad_file:
+        return st.read(_as_str(Path(data_dir) / h5ad_file), **kwargs)
+    return st.read(_as_str(data_dir), **kwargs)
 
 
 READERS: Dict[str, Callable[..., Any]] = {
@@ -186,22 +224,16 @@ READERS: Dict[str, Callable[..., Any]] = {
     "stereoseq_agg": read_stereoseq_agg,
     "stereo-seq-agg": read_stereoseq_agg,
     "xenium": read_xenium,
-    "visium": read_visium,
-    "visium_hd": read_visium_hd,
-    "visium-hd": read_visium_hd,
+    "visium": read_10x_visium,
+    "visium_hd": read_10x_visium_hd,
+    "visium-hd": read_10x_visium_hd,
     "openst": read_openst,
     "open-st": read_openst,
 }
 
 
 def read_by_platform(platform: str, data_path: PathLike, **kwargs: Any) -> Any:
-    """Dispatch to a platform-specific reader by name.
-
-    Examples
-    --------
-    >>> adata = read_by_platform("slideseq", "../../data/Slideseq", load_images=False)
-    >>> adata = read_by_platform("xenium", "../../data/xenium_outs")
-    """
+    """Dispatch to a platform-specific reader by name."""
     key = platform.lower().replace(" ", "_")
     if key not in READERS:
         raise ValueError(
@@ -218,8 +250,8 @@ __all__ = [
     "read_stereoseq",
     "read_stereoseq_agg",
     "read_xenium",
-    "read_visium",
-    "read_visium_hd",
+    "read_10x_visium",
+    "read_10x_visium_hd",
     "read_openst",
     "read_by_platform",
     "READERS",

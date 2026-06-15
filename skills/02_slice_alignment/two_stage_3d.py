@@ -22,7 +22,7 @@ from typing import Any, Mapping, Optional, Sequence, Union
 
 import numpy as np
 
-from ..shared.data_helpers import (
+from skills.shared.data_helpers import (
     LOGGER,
     PathLike,
     configure_logging,

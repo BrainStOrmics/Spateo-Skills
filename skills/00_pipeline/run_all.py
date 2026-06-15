@@ -21,7 +21,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Optional, Sequence
 
-from ..shared.data_helpers import (
+from skills.shared.data_helpers import (
     configure_logging,
     infer_device,
     load_h5ad,
@@ -101,12 +101,12 @@ def run_stage2(config: PipelineConfig, aligned_adata: Any) -> str:
 
     cfg = reconstruction.ReconstructionConfig(
         input_path=str(tmp_path),
-        model_type=config.model_type,
+        models=[config.model_type] if config.model_type else ["point-cloud", "surface"],
         groupby=config.groupby,
         out_dir=config.out_dir,
         **config.stage2_kwargs,
     )
-    return reconstruction.run_reconstruction_pipeline(cfg).outdir
+    return reconstruction.run_reconstruction_pipeline(cfg).output_dir
 
 
 def run_stage3(config: PipelineConfig, stage2_adata: Any) -> str:
@@ -114,13 +114,15 @@ def run_stage3(config: PipelineConfig, stage2_adata: Any) -> str:
         raise ValueError("Set --stage2-path for Stage 3 (morphogenesis)")
     vectorfield = importlib.import_module("skills.04_morphogenesis.vectorfield")
 
+    vf_out = str(Path(config.out_dir) / "morphogenesis")
     cfg = vectorfield.VectorFieldConfig(
         stage1_path=str(Path(config.out_dir) / "_stage2_aligned.h5ad"),
         stage2_path=config.stage2_path,
-        groupby=config.groupby,
+        output_path=vf_out,
         **config.stage3_kwargs,
     )
-    return vectorfield.run_vectorfield_pipeline(cfg).outdir
+    vectorfield.run_vectorfield_pipeline(cfg)
+    return vf_out
 
 
 def run_full_pipeline(config: PipelineConfig) -> PipelineResult:

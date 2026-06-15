@@ -338,7 +338,7 @@ def run_feature_pipeline(config: FeatureConfig, **kwargs: Any) -> FeatureResult:
 
 def configure_logging(verbose: bool = False) -> None:
     """Configure root logger for this module."""
-    from ..shared.data_helpers import configure_logging as _configure
+    from skills.shared.data_helpers import configure_logging as _configure
 
     _configure(verbose)
 

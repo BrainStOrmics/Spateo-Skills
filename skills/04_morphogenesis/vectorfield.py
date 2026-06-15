@@ -77,6 +77,40 @@ def patch_pot_cg_if_needed() -> bool:
     return False
 
 
+def patch_align_preprocess_kwarg() -> bool:
+    """Fix spateo bug: paste_pairwise_align passes extra kwargs that align_preprocess doesn't accept.
+
+    - layer -> rep_layer
+    - select_high_exp_genes -> dropped (align_preprocess doesn't use it)
+    - normalize_c / normalize_g -> dropped (not in align_preprocess signature)
+    """
+    try:
+        import functools
+
+        from spateo.alignment.methods import paste as paste_mod
+        from spateo.alignment.methods.deprecated_utils import align_preprocess as _orig
+
+        if hasattr(_orig, "_patched_align"):
+            return False
+
+        _DROP_KWARGS = {"select_high_exp_genes", "normalize_c", "normalize_g"}
+
+        @functools.wraps(_orig)
+        def _wrapper(*args: Any, **kwargs: Any) -> Any:
+            layer = kwargs.pop("layer", None)
+            if layer is not None:
+                kwargs.setdefault("rep_layer", layer)
+            for k in _DROP_KWARGS:
+                kwargs.pop(k, None)
+            return _orig(*args, **kwargs)
+
+        _wrapper._patched_align = True
+        paste_mod.align_preprocess = _wrapper
+        return True
+    except Exception:
+        return False
+
+
 def _nonzero_gene_mask(layer: Any) -> np.ndarray:
     sums = np.asarray(layer.sum(axis=0)).ravel()
     return sums != 0
@@ -413,6 +447,7 @@ def run_vectorfield_pipeline(config: VectorFieldConfig, **kwargs: Any) -> Vector
     """End-to-end morphogenesis mapping, vector-field, and trajectory pipeline."""
     result = VectorFieldResult(vf_key=config.vf_key)
     result.pot_patched = patch_pot_cg_if_needed()
+    patch_align_preprocess_kwarg()
 
     stage1_adata, stage2_adata = load_stage_pair(
         config.stage1_path,
@@ -497,7 +532,7 @@ def run_vectorfield_pipeline(config: VectorFieldConfig, **kwargs: Any) -> Vector
 
 def configure_logging(verbose: bool = False) -> None:
     """Configure root logger for this module."""
-    from ..shared.data_helpers import configure_logging as _configure
+    from skills.shared.data_helpers import configure_logging as _configure
 
     _configure(verbose)
 

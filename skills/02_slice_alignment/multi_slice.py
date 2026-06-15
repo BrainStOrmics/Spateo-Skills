@@ -22,7 +22,7 @@ from typing import Any, Mapping, Optional, Sequence
 
 import numpy as np
 
-from ..shared.data_helpers import (
+from skills.shared.data_helpers import (
     LOGGER,
     PathLike,
     configure_logging,
@@ -97,7 +97,7 @@ def preprocess_adata(
     run_pca: bool = True,
     **kwargs: Any,
 ) -> Any:
-    from spateo.preprocessing.protocol_pipeline import preprocess_spatial
+    import spateo as st
 
     preprocess_spatial(
         adata,

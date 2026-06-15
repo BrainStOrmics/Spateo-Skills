@@ -1,14 +1,11 @@
 #!/usr/bin/env python3
 """auto_read — Auto-detect platform and read spatial transcriptomics data.
 
-Detects the spatial platform (Xenium, Visium, MERFISH, etc.) from the
-data directory structure, then reads data into AnnData with
-``.obsm["spatial"]`` populated.
+Detects the spatial platform by inspecting directory contents (file names,
+structure), then dispatches to the appropriate reader from manual_read.
 
 Usage:
-    python -m skills.01_data_io.auto_read --data-path ./data/unknown/
-
-Source notebook: autoread_skills.ipynb
+    python -m skills.01_data_io.auto_read --data-path ./data/unknown_dataset/
 """
 
 from __future__ import annotations
@@ -21,34 +18,74 @@ LOGGER = logging.getLogger("data_io.auto_read")
 
 PathLike = Union[str, Path]
 
+PLATFORM_SIGNATURES = {
+    "xenium": [
+        "cell_boundaries.csv", "cell_boundaries.csv.gz",
+        "cell_boundaries.parquet", "cells.csv", "cells.csv.gz",
+        "cells.parquet", "gene_panel.json",
+    ],
+    "visium": [
+        "spatial/scalefactors_json.json",
+        "spatial/tissue_positions_list.csv",
+    ],
+    "visium_hd": [
+        "spatial/tissue_positions.parquet",
+        "binned_outputs",
+    ],
+    "merfish": [
+        "cell_by_gene.csv", "cell_metadata.csv",
+    ],
+    "seqfish": [
+        "CxG", "_CxG_", "section",
+    ],
+    "stereoseq": [
+        ".gem", ".gem.txt", ".bin",
+    ],
+    "slideseq": [
+        "MappedDGEForR.csv", "BeadLocationsForR.csv",
+    ],
+    "starmap_plus": [
+        "processed_expression_pd.csv", "_spatial.csv",
+    ],
+    "openst": [
+        ".h5ad",
+    ],
+}
 
-def _import_spateo() -> Any:
-    try:
-        import spateo as st  # type: ignore
-        return st
-    except ImportError as exc:
-        raise ImportError(
-            "spateo is required. Install via Spateo-Skills/00_env_setup/."
-        ) from exc
+
+def _files_in_dir(path: Path) -> set[str]:
+    """Return set of file and subdir names in *path*."""
+    return {p.name for p in path.iterdir()} if path.is_dir() else set()
 
 
-def _load_auto_io() -> tuple[Any, Any]:
-    try:
-        from spateo.io.protocol_io.spatial.auto import (  # type: ignore
-            detect_spatial_technology,
-            read_auto_spatial,
-        )
-        return detect_spatial_technology, read_auto_spatial
-    except Exception as exc:
-        raise ImportError(
-            "spateo.io.protocol_io.spatial.auto is required for auto-detection."
-        ) from exc
+def _file_exists(path: Path, subpath: str) -> bool:
+    return (path / subpath).exists()
 
 
-def detect_spatial_platform(data_dir: PathLike, **detect_kwargs: Any) -> Any:
-    """Auto-detect the spatial transcriptomics platform for a data directory."""
-    detect_spatial_technology, _ = _load_auto_io()
-    return detect_spatial_technology(str(Path(data_dir)), **detect_kwargs)
+def detect_spatial_platform(data_dir: PathLike, **kwargs: Any) -> str:
+    """Auto-detect the spatial transcriptomics platform for a data directory.
+
+    Checks file names and sub-directory patterns against known signatures.
+    Returns the platform key (e.g. "xenium", "visium", "merfish").
+    """
+    p = Path(data_dir)
+    files = _files_in_dir(p)
+    file_list = " ".join(files).lower()
+
+    for platform, signatures in PLATFORM_SIGNATURES.items():
+        for sig in signatures:
+            sig_lower = sig.lower()
+            if "/" in sig:
+                if _file_exists(p, sig):
+                    return platform
+            else:
+                if any(sig_lower in f.lower() for f in files):
+                    return platform
+
+    raise ValueError(
+        f"Cannot detect platform for {data_dir!r}. "
+        f"Recognized signatures: {list(PLATFORM_SIGNATURES.keys())}"
+    )
 
 
 def read_auto_spatial_data(
@@ -59,13 +96,14 @@ def read_auto_spatial_data(
 ) -> Any:
     """Auto-detect platform and read spatial data into AnnData.
 
-    Returns ``(adata, match)`` when *return_match* is True, else ``adata``.
+    Returns (adata, platform) when return_match is True, else adata.
     """
-    detect_spatial_technology, read_auto_spatial = _load_auto_io()
-    data_dir_str = str(Path(data_dir))
-    match = detect_spatial_technology(data_dir_str)
-    adata = read_auto_spatial(data_dir_str, **read_kwargs)
-    return (adata, match) if return_match else adata
+    from .manual_read import read_by_platform
+
+    platform = detect_spatial_platform(data_dir)
+    LOGGER.info("Auto-detected platform: %s", platform)
+    adata = read_by_platform(platform, data_dir, **read_kwargs)
+    return (adata, platform) if return_match else adata
 
 
 def read_many_auto(
@@ -78,7 +116,7 @@ def read_many_auto(
     """Batch auto-read multiple spatial data directories.
 
     On failure per directory: stores the exception in the result dict
-    unless *stop_on_error* is True.
+    unless stop_on_error is True.
     """
     results: Dict[str, Any] = {}
     for data_dir in data_dirs:

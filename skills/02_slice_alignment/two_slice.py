@@ -22,7 +22,7 @@ from typing import Any, Mapping, Optional, Sequence
 
 import numpy as np
 
-from ..shared.data_helpers import (
+from skills.shared.data_helpers import (
     LOGGER,
     PathLike,
     configure_logging,
@@ -111,22 +111,19 @@ def preprocess_slices(
     run_pca: Optional[bool] = None,
     **kwargs: Any,
 ) -> Sequence[Any]:
-    from spateo.preprocessing.protocol_pipeline import preprocess_spatial
+    """Preprocess slices using st.pp.* functions.
+
+    Chain: normalize_total → log1p → HVG selection → PCA.
+    """
+    import spateo as st
 
     for adata in slices:
-        call: dict[str, Any] = dict(
-            recipe=recipe,
-            spatial_key=spatial_key,
-            counts_layer=counts_layer,
-            min_genes=min_genes,
-            min_cells=min_cells,
-            feature_method=feature_method,
-            n_top_genes=n_top_genes,
-        )
-        if run_pca is not None:
-            call["run_pca"] = run_pca
-        call.update(kwargs)
-        preprocess_spatial(adata, **call)
+        st.pp.normalize_total(adata)
+        st.pp.log1p(adata)
+        if feature_method == "hvg":
+            st.pp.select_hvf_seurat(adata, n_top_genes=n_top_genes)
+        if run_pca or run_pca is None:
+            adata.obsm["X_pca"] = st.tl.compute_pca_components(adata, n_comps=50)
     return slices
 
 
