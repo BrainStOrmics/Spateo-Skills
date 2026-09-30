@@ -1,0 +1,43 @@
+---
+name: spateo-3d-pipeline
+description: Build Spateo point clouds and body or tissue surface meshes from finite XYZ AnnData, or import reconstructed VTK models into an offline interactive 3D review viewer; route later model phases only when their subskills are available.
+---
+
+# Spateo 3D pipeline
+
+Stage 5: environment → IO → slice quality → 2D alignment → **3D reconstruction** → 4D analysis. A point cloud is the lossless model foundation for later 3D models: one input observation becomes one PyVista point and remains traceable through `obs_index`.
+
+Use Spateo from `gmhhhhhh-929/spateo-release` commit `615644f88613bea8ceb2e2df1e2391d16de55ec1`. The library is installed separately; this skill does not vendor it.
+
+## Route by model
+
+| Model or operation | Status | Route |
+| --- | --- | --- |
+| Point cloud (`pc`) | Implemented | Read [spateo-reconstruct-point-cloud](subskills/spateo-reconstruct-point-cloud/SKILL.md) and use its validated builder. |
+| Full-body or annotation surface mesh | Implemented | First create a traceable point-cloud VTK, then read [spateo-reconstruct-mesh](subskills/spateo-reconstruct-mesh/SKILL.md). |
+| Interactive model review / viewer | Implemented | Read [spateo-render-3d-viewer](subskills/spateo-render-3d-viewer/SKILL.md) to import existing body/tissue VTKs and optional cells into offline HTML. No reconstruction prerequisite when models already exist. |
+| Voxel or reconstructed cells | Pending | Do not invent a runner or claim completion; develop and validate the next subskill with the user. |
+| Backbone construction and mapping | Pending | Preserve as a later reviewed phase. |
+| Spatial gene interpolation | Pending | Preserve as a later reviewed phase; do not confuse it with 4D morphogenesis GP. |
+
+## Point-cloud gate
+
+Require a non-empty H5AD with unique `obs_names` and numeric, finite `(n_obs, 3)` coordinates under the selected `obsm` key, normally `spatial`. Do not infer z, coordinate units, alignment, annotations, or gene semantics. Full 3D coordinate rank is the default; accept planar XYZ only when the user explicitly intends it.
+
+Color points uniformly, from an `obs` field, from one gene, from the sum of named genes, or from an exact-ID external label/value table. Stable categorical biology colors should use an explicit full palette. Keep continuous expression as a numeric scalar plus its colormap provenance.
+
+Every implemented single-dataset model must be saved with `st.tdr.save_model(..., "*.vtk")`, reloaded with `st.tdr.read_model`, and checked before handoff. Never overwrite an existing result. Return the VTK, manifest, and four-view preview for review; preview sampling must not alter the full VTK.
+
+## Surface-mesh gate
+
+Start from the validated point-cloud VTK rather than rereading coordinates through an unrelated path. Require `obs_index`; annotation selections additionally require the requested categorical point-data array. Save the body and each selected annotation as an independent `.vtk` so they can be displayed or hidden separately.
+
+Prefer the mesh skill's density-field route for volume-filling cell centroids. It filters low-support derived components without deleting source cells, uses one coordinate grid for aligned overlays, and records coverage/topology evidence. Use the pinned Spateo marching-cubes core only as an explicit comparison or user choice; its correct parameter name is `mc_scale_factor`, and high Laplacian `smooth` values can shrink anatomy. Stop after mesh review unless the user authorizes another model phase.
+
+Install this complete directory so the nested workflow, script, references, and tests remain together.
+
+## Interactive review gate
+
+When the user asks to display or inspect existing models, route directly to the viewer subskill; do not rerun H5AD processing or reconstruction. After reconstruction, offer the same viewer for interactive review. It supports independent datasets, per-tissue collapsed Mesh/Cells controls, opacity, camera interaction and source-resolution morphology on selection. Preserve original coordinates and models. Technical diagnostics stay in a provenance sidecar; the English presentation stays compact. Return a locally usable HTML artifact; publishing or replacing an existing website requires separate user authorization.
+
+When refining meshes from visual feedback, route to the mesh skill's coverage-and-envelopes reference. Audit sparse regional coverage after final processing, preserve original cells, and validate smooth non-convex body containment beyond vertices. Do not equate tissue-union occupancy with anatomical completeness or force independent lineages to fill an expanded display shell.

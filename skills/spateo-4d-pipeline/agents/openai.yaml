@@ -1,0 +1,4 @@
+interface:
+  display_name: "Spateo 4D Pipeline"
+  short_description: "Four-stage analysis with an adaptive offline viewer"
+  default_prompt: "Use $spateo-4d-pipeline with the modular spateo-4d/v4 workflow."

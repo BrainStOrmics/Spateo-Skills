@@ -1,54 +1,46 @@
-# 源码审查与可重复验证
+# Validation
 
-## 依据与覆盖
-
-本技能依据源码提交 `d6aa68addc475dd0b56f69cebe7823b1f79933a9`；[source_manifest.json](source_manifest.json) 列出所读 `spateo/data_io.py`、`spateo/io` 和 `tests/io` 共 32 个 Python 文件的 SHA256。实现签名从 AST 提取到 [source-api.md](source-api.md)。未使用旧 organization 技能作为 reader 权威，未复制大型原始数据或改动源码。
-
-## 实际测试环境
-
-此次审查使用本机已存在的 Python **3.9.6** 科学栈，真实导入该 checkout 的 `spateo.io`，没有 reader mock、没有替代实现、没有安装环境。这个结果只证明所测 **局部 IO** 在该现成环境运行成功，**不表示推荐或支持用 Python 3.9 安装 Spateo**。源码 `setup.py` 正式要求 `>=3.10,<3.13`，面向用户的安装与常规执行应选 Python 3.10–3.12。
-
-包版本：anndata 0.10.9、NumPy 2.0.2、SciPy 1.13.1、pandas 2.3.3、h5py 3.14.0、Matplotlib 3.9.4、Pillow 11.3.0。机器化合成结果在 [smoke_result.json](smoke_result.json)，记录实际 Python、提交、版本和每项检查名。
-
-## 重复合成测试
-
-在技能目录中执行（`SOURCE` 指用户选定的、上述提交的源码 checkout）：
+Run against the pinned Spateo checkout with its existing Python 3.10–3.12 environment:
 
 ```bash
-PYTHONDONTWRITEBYTECODE=1 MPLBACKEND=Agg PYTHONPATH="$SOURCE" \
-  python scripts/smoke_source.py --source-root "$SOURCE"
+PYTHONPATH=/path/to/spateo-release python scripts/smoke_source.py --source-root /path/to/spateo-release
 ```
 
-脚本使用临时目录，完成后清理自己的合成输入，读写均不涉及原始实验数据。它核验源码 commit 和实际 import 路径，再调用 public reader；JSON 的 `status` 和 `n_tests` 是当前复核结果。覆盖：
+This verifies the pinned commit and hashes of every Python file under `spateo/io`, then executes the source IO suite, native-runtime tests and the skill's behavioral CLI tests. The skill checks full and partial collection outcomes, lazy selected loading, discovery without full-file hashing, native domestic auto/direct routes, stable feature IDs, reversed coordinate joins, missing-file recovery, CLI exports, H5AD roundtrips and rejected overwrites. Readers are real; fault-injection tests separately simulate manifest serialization/publication failures and verify no false successful output is left behind.
 
-- 10x H5 的 gene×cell→cell×gene 方向与 barcode 顺序，表达文件不自动生成坐标。
-- Visium 按 ID 重排 metadata、XY 的 col/row 顺序、图片/scale/auto provenance、in_tissue 的原样保留及 H5AD 读回。
-- 非有限坐标失败；通用 IO 保留 XYZ，而显式 2D 拒绝三列。
-- one-hot 不冒充 expression PCA、共享类别顺序校验、PCA 零范数与 spatial-only 零向量拒绝。
-- Atera preview 的真实检测、坐标身份与 scale 不重复应用。
-- BGI AGG 网格与 bin/label×gene 区别、计数守恒、centroid、四选一参数、add_props=False 不生成坐标。
-- Seq-Scope barcode 原样模式与 bin 聚合的身份/计数守恒。
-- HD bin/cellseg 自动识别歧义及显式模式的路径选择。
-- 通用 CSV 返回 DataFrame；CLI detect、真实转换、只读验证、输出拒绝覆盖及 XYZ 不截断的往返。
+The domestic independent-reader tests disable automatic entry points and parsing, trace both routes to the same `_tech.py.read_core`, and recursively inspect imports. Additional legacy-platform tests disable the automatic entry point while exercising direct readers. This does not imply that every public direct API is independent: `read_stereoseq` remains a convenience wrapper around automatic reading, and Seq-Scope has no automatic route. Expected counts, coordinates, IDs and images are specified independently of the parser; matching two readers alone is not sufficient evidence of correctness.
 
-## 原始源码测试
-
-此次还直接运行了以下未修改源码测试：
+After reviewing and committing an intentional source update, regenerate the source API and manifest:
 
 ```bash
-PYTHONDONTWRITEBYTECODE=1 MPLBACKEND=Agg PYTHONPATH="$SOURCE" \
-  python -m pytest -q -p no:cacheprovider \
-  "$SOURCE/tests/io/test_spatial_auto.py" \
-  "$SOURCE/tests/io/test_io_layout.py" \
-  "$SOURCE/tests/io/test_atera_visium.py"
+python scripts/refresh_source_manifest.py --source-root /path/to/spateo-release
+python scripts/refresh_source_manifest.py --source-root /path/to/spateo-release --check
 ```
 
-结果：**13 passed**；14 条 Matplotlib/pyparsing 弃用警告，没有测试失败。`test_bgi.py` 依赖真实 fixture，`test_utils.py` 使用同一 fixture mixin，未冒充已运行；其源码已读。`test_image.py` 本提交为空文件。这不是整个 Spateo 测试套件通过的声明。
+Generation refuses uncommitted IO changes so that the named commit describes the hashed files. Updating the manifest is not a substitute for tests or API review. The CLI records its expected source commit without claiming to have verified the running installation; use the smoke runner to establish that match.
 
-`skill-creator/scripts/quick_validate.py` 已通过本技能 frontmatter、名称和 scaffold 检查；三个脚本还进行了编译检查和真实 CLI 调用。该结构检查不替代科学输入契约验证。
+For a focused CLI run:
 
-## 验证边界
+```bash
+PYTHONPATH=/path/to/spateo-release python -m pytest scripts/test_spateo_io.py -q
+```
 
-MERFISH、seqFISH、CosMx、Slide-seq、STARmap、HD cell segmentation 的大型真实数据／所有版本组合尚未由本次合成测试证明。相应路由来自固定源码静态审查，读入后仍要核对文件格式、ID 覆盖、内存和单位。source 内有已知边界（过时 docstring、BGI uint16/gene_agg 分箱、按行匹配、cache 失效、HD writer ID 规则），见 [auto-and-errors.md](auto-and-errors.md)。
+The tests use tiny synthetic native files, including two observations and duplicate gene symbols, rather than preassembled H5ADs for the new domestic input readers. Inspect the actual command output and recorded run reports for counts; a previous run's test count is not a claim about the current checkout.
 
-本技能的验证器只报告数值与结构，不证明 PCA 的来源或生物注释正确性，也不进行分割、配准、准确率评价或读取参考配准坐标。CLI 在 manifest 中明确 `source_commit_verified_by_cli=False`：它记录实际导入模块文件与 SHA256，但只有合成测试／独立 provenance 检查验证指定 commit；用户换环境后应重新核对。目录输入只提供文件清单，核心输入内容 SHA256 需根据选定文件单独补充，不能把目录清单当完整内容哈希。
+Source tests cover multiple synthetic platform contracts and errors. They do not establish all vendor-version compatibility, biological annotations, large-data performance, or alignment accuracy. A successful numeric audit does not identify normalized data as raw counts. An optional-asset warning can coexist with a ready core matrix.
+
+## Current verified revision, 2026-09-30
+
+Pinned source `22b91af5888930838a1d4a46057404db86574ffa`: all **48 IO Python file hashes** match. The complete source IO, native-runtime and skill CLI smoke finished with **431 passed, 1 skipped** in 24.99 seconds. The source IO scope is **405 passed, 1 skipped**, including **168 new checks** (73 10x, 61 imaging-platform, 34 other native-reader checks). The skipped optional source test needs a supplied real-Visium path; this round separately completed the full real Visium audit below.
+
+All 18 changed/new source Python files passed compilation, isort/Black and whitespace checks. Repository-wide `make check` still reports three unchanged baseline isort failures, documented in the source audit; it is not a passing whole-repository check. The smoke log retains 99 expected fixture/runtime warnings. Skill frontmatter and whitespace checks also passed.
+
+## Accuracy audit and limits
+
+The [non-domestic reader validation](https://github.com/gmhhhhhh-929/spateo-release/blob/22b91af5888930838a1d4a46057404db86574ffa/docs/technicals/non_domestic_reader_validation_zh.md) and its [machine-readable record](https://github.com/gmhhhhhh-929/spateo-release/blob/22b91af5888930838a1d4a46057404db86574ffa/docs/technicals/non_domestic_reader_validation_20260930.json) describe per-platform coverage, fixes, successful and rejected cases, and intentional route differences. Report actual source-test and smoke-run totals for the pinned revision after running the commands above; these are case pass rates, not a population-wide accuracy estimate.
+
+Independent native fixtures cover H5/MEX, CSV/TSV/gzip/Parquet, GeoJSON and GEM/GEF layouts with shuffled IDs, duplicate gene symbols, leading-zero identifiers, large counts, fractional XY/XYZ, optional images, invalid inputs and H5AD roundtrips. Tests compare expected source values independently of the parser. Processed STARmap values, 10x Gene Expression filtering, bin center/origin conventions, FOV frames, direct-only Seq-Scope and the Stereo wrapper are recorded separately rather than forcing identical outputs.
+
+Fresh complete-source audits in this round use the native Visium `V1_Adult_Mouse_Brain` and Slide-seq `Puck_180413_7` datasets. Both automatic and direct matrices, identities and coordinates match their complete original sources, with four successful H5AD roundtrips. Visium hires/lowres pixels and scales agree exactly. Slide-seq's original 6030 × 6030 bead image is loaded by the direct reader; automatic reading retains its path as `deferred_resource` because its decoded 36,360,900 bytes exceed 32 MiB. This is intended asset budgeting, not a core count failure. Other platforms in this round have native-schema fixture coverage rather than new public production-data audits; there is no fresh MOSTA/ARTISTA full read in this round.
+
+The earlier [domestic reader validation](https://github.com/gmhhhhhh-929/spateo-release/blob/82002ba0910a0fa29874f1da92e49a76bc9186a7/docs/technicals/domestic_reader_refactor_validation_20260930.json) separately records 237 source IO passes, one skip, 38 independent-reader checks, and the full native BMKMANU audit. It is historical evidence for that revision, not the current test total.

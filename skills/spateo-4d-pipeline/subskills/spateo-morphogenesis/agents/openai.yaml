@@ -1,0 +1,4 @@
+interface:
+  display_name: "Spateo Fields and Trajectories"
+  short_description: "Map matching cell types and infer native trajectories"
+  default_prompt: "Use $spateo-morphogenesis with the modular spateo-4d/v4 workflow."
